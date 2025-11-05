@@ -1,11 +1,43 @@
-<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>My Proxy</title></head>
-<body>
-  <h3>Enter a URL to open</h3>
-  <form action="https://my-anon-proxy.workers.dev/" method="GET">
-    <input name="url" placeholder="https://example.com" style="width:60%"/>
-    <button>Open</button>
-  </form>
-</body>
-</html>
+// safe-proxy.js
+import express from "express";
+import fetch from "node-fetch";
+
+const app = express();
+
+// 自分が許可するドメインだけ（ここはあなたのドメインに変更）
+const ALLOWED_DOMAIN = "https://kareka.ddo.com";
+
+// ミドルウェア：自分だけアクセスできるよう制限（例: 簡単なトークン認証）
+app.use((req, res, next) => {
+  const token = req.headers["x-api-key"];
+  if (token !== "my-secret-token") {
+    return res.status(403).send("Access denied");
+  }
+  next();
+});
+
+app.get("/proxy", async (req, res) => {
+  const target = req.query.url;
+
+  // URLが指定されていない場合
+  if (!target) {
+    return res.status(400).send("Please provide ?url=");
+  }
+
+  // 自分のドメイン以外は拒否
+  if (!target.startsWith(ALLOWED_DOMAIN)) {
+    return res.status(403).send("Access denied: only kareka.ddo.com is allowed");
+  }
+
+  try {
+    const response = await fetch(target);
+    const contentType = response.headers.get("content-type");
+    res.set("content-type", contentType);
+    const text = await response.text();
+    res.send(text);
+  } catch (err) {
+    res.status(500).send("Error fetching URL: " + err.message);
+  }
+});
+
+app.listen(8080, () => console.log("Safe proxy running on http://localhost:8080"));
